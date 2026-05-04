@@ -6,8 +6,8 @@
 import { useCallback, useEffect, useRef, memo } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { Icon } from '@mdi/react'
-import { mdiMonitorScreenshot, mdiImageMultiple, mdiTimerOutline, mdiVote, mdiGrid, mdiMagnify } from '@mdi/js'
-import { MainMenu, CaptureUpdateAction } from '@nextcloud/excalidraw'
+import { mdiMonitorScreenshot, mdiImageMultiple, mdiTimerOutline, mdiVote, mdiGrid, mdiMagnify, mdiFilePdfBox } from '@mdi/js'
+import { MainMenu, CaptureUpdateAction, exportToSvg } from '@nextcloud/excalidraw'
 import { RecordingMenuItem } from './Recording'
 import { PresentationMenuItem } from './Presentation'
 import { CreatorMenuItem } from './CreatorMenuItem'
@@ -89,6 +89,33 @@ export const ExcalidrawMenu = memo(function ExcalidrawMenu({ fileNameWithoutExte
 
 		requestAnimationFrame(restoreFocus)
 	}, [fileNameWithoutExtension])
+
+	const downloadAsPdf = useCallback(async () => {
+		if (!excalidrawAPI) {
+			return
+		}
+
+		const elements = excalidrawAPI.getSceneElements()
+		const appState = excalidrawAPI.getAppState()
+		const files = excalidrawAPI.getFiles()
+
+		const svg = await exportToSvg({ elements, appState, files, exportPadding: 10 })
+
+		const svgWidth = parseFloat(svg.getAttribute('width') ?? '800')
+		const svgHeight = parseFloat(svg.getAttribute('height') ?? '600')
+
+		const { jsPDF } = await import('jspdf')
+		const { default: svg2pdf } = await import('svg2pdf.js')
+
+		const doc = new jsPDF({
+			orientation: svgWidth > svgHeight ? 'l' : 'p',
+			unit: 'px',
+			format: [svgWidth, svgHeight],
+		})
+
+		await svg2pdf(svg, doc, { x: 0, y: 0, width: svgWidth, height: svgHeight })
+		doc.save(`${fileNameWithoutExtension}.pdf`)
+	}, [excalidrawAPI, fileNameWithoutExtension])
 
 	const takeScreenshotRef = useRef(takeScreenshot)
 	useEffect(() => {
@@ -190,6 +217,11 @@ export const ExcalidrawMenu = memo(function ExcalidrawMenu({ fileNameWithoutExte
 				onSelect={takeScreenshot}
 				shortcut={isMacPlatform ? '⌘+⌥+S' : t('whiteboard', 'Ctrl+Alt+S')}>
 				{t('whiteboard', 'Download screenshot')}
+			</MainMenu.Item>
+			<MainMenu.Item
+				icon={<Icon path={mdiFilePdfBox} size={0.75} />}
+				onSelect={downloadAsPdf}>
+				{t('whiteboard', 'Download as PDF')}
 			</MainMenu.Item>
 			<MainMenu.Item
 				icon={<Icon path={mdiVote} size="16px" />}
